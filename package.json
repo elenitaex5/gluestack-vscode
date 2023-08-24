@@ -24,6 +24,8 @@
     ]
   },
   "scripts": {
+    "create-plugin": "node scripts/create-plugin",
+    "delete-plugin": "node scripts/delete-plugin",
     "vscode:prepublish": "npm run package",
     "compile": "webpack",
     "watch": "webpack --watch",
@@ -48,6 +50,7 @@
     "ts-loader": "^9.4.3",
     "webpack": "^5.85.0",
     "webpack-cli": "^5.1.1",
-    "@vscode/test-electron": "^2.3.2"
+    "@vscode/test-electron": "^2.3.2",
+    "prompts": "^2.4.2"
   }
 }
