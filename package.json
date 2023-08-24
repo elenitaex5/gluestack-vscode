@@ -14,14 +14,12 @@
   "contributes": {
     "commands": [
       {
+        "command": "gluestack-vscode.authenticate",
+        "title": "authenticate"
+      },
+      {
         "command": "gluestack-vscode.helloWorld",
         "title": "Hello World"
-      }
-    ],
-    "snippets": [
-      {
-        "language": "javascript",
-        "path": "./gluestack.code-snippets"
       }
     ]
   },
