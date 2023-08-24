@@ -1,7 +1,7 @@
+import { PluginController } from "./../../PluginController";
 import { PluginUISnippets } from "./../plugin-ui-snippets";
 import * as vscode from "vscode";
 import { BasePlugin } from "../base-plugin";
-import { PluginController } from "../../PluginController";
 
 export class PluginAuth implements BasePlugin {
   pluginId: string = "PluginAuth";
@@ -19,7 +19,6 @@ export class PluginAuth implements BasePlugin {
   // Activate the plugin
   activate(context: vscode.ExtensionContext): void {
     console.log("Congratulations, you are in activate of auth plugin !");
-    // const uiSnippet = this.pluginController.getPluginInstance(PluginUISnippets);
 
     let authCommand = vscode.commands.registerCommand(
       "gluestack-vscode.authenticate",
@@ -31,6 +30,9 @@ export class PluginAuth implements BasePlugin {
           vscode.window.showInformationMessage("User already authenticated!");
         } else {
           await authenticate(context);
+          const pluginUISnippetsInstance =
+            this.pluginController.getPluginInstance(PluginUISnippets);
+          pluginUISnippetsInstance?.checkAuth(context);
         }
       }
     );
@@ -40,7 +42,7 @@ export class PluginAuth implements BasePlugin {
 }
 
 async function authenticate(context: vscode.ExtensionContext) {
-  const authorizationUrl = "https://google.com";
+  const authorizationUrl = "http://localhost:4001/";
 
   // Open a webview for authentication
   const panel = vscode.window.createWebviewPanel(

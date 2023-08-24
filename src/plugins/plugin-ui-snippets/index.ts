@@ -90,6 +90,12 @@ export class PluginUISnippets implements BasePlugin {
     throw new Error("Method not implemented.");
   }
 
+  checkAuth(context: vscode.ExtensionContext): void {
+    console.log("Auth worked");
+    const token = context.globalState.get("authToken");
+    console.log(token);
+  }
+
   // Activate the plugin
   activate(context: vscode.ExtensionContext): void {
     console.log("Congratulations, you are in activate of ui-snippets plugin !");
