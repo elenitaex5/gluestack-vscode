@@ -1,5 +1,5 @@
 import { PluginController } from "./../../PluginController";
-import { PluginUISnippets } from "./../plugin-ui-snippets";
+import { PluginUISnippets } from "../ui-snippets";
 import * as vscode from "vscode";
 import { BasePlugin } from "../base-plugin";
 
