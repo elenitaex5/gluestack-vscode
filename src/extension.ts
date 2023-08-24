@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 
 // Plugin Imports
-import { PluginAuth } from "./plugins/plugin-auth";
+import { PluginAuth } from "./plugins/auth";
 import { PluginUISnippets } from "./plugins/plugin-ui-snippets";
 
 // Plugin Controller
