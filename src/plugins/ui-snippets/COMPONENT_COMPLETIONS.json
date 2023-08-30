@@ -1,4 +1,4 @@
-export default {
+{
   "BadgeStoryBadge-outline-error-sm": {
     "completion": "BadgeStoryBadge-outline-error-sm",
     "imports": [
@@ -6404,4 +6404,4 @@ export default {
     ],
     "template": "\n    <Tooltip\n      offset={10}\n      placement={placement}\n      isOpen={showTooltipProp}\n      // eslint-disable-next-line react/no-unstable-nested-components\n      trigger={(triggerProps: any) => {\n        return (\n          <Button {...triggerProps}>\n            <ButtonText>More</ButtonText>\n          </Button>\n        "
   }
-};
+}

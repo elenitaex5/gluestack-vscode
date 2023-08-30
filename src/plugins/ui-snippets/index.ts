@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { BasePlugin } from "../base-plugin";
-import { COMPONENT_COMPLETIONS } from "./COMPONENT_COMPLETIONS";
+import COMPONENT_COMPLETIONS from "./COMPONENT_COMPLETIONS";
 import { PluginController } from "../../PluginController";
 
 export class GluestackProvider implements vscode.CompletionItemProvider {
