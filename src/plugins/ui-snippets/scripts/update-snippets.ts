@@ -2,6 +2,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as json5 from "json5";
 import { execSync, spawn } from "child_process";
+import * as parser from "@babel/parser";
+import traverse from "@babel/traverse";
 
 const currPath = path.resolve(__dirname);
 const rootPath = path.resolve(path.join(currPath, "..", "..", "..", ".."));
@@ -91,6 +93,7 @@ function createFolders(pathx: string) {
   });
 }
 
+// clone repo from git, it will checkout to the specified branch and delete all the ignored paths as well
 async function cloneRepoSrc() {
   execSync("git clone " + repoConfig.gitUrl, {
     stdio: [0, 1, 2], // we need this so node will print the command output
@@ -103,6 +106,7 @@ async function cloneRepoSrc() {
   deleteIgnoredPaths(docsPath, repoConfig.ignoredPaths);
 }
 
+// function to checkout to the specified branch: used in cloneRepoSrc function
 function checkoutBranch(repoPath: any, branchName: any) {
   const command = `git -C ${repoPath} checkout ${branchName}`;
 
@@ -111,6 +115,7 @@ function checkoutBranch(repoPath: any, branchName: any) {
   } catch (error) {}
 }
 
+// function to delete all the ignored paths: used in cloneRepoSrc function
 function deleteIgnoredPaths(srcDir: any, paths: any) {
   try {
     for (let i = 0; i < paths?.length; i++) {
@@ -131,6 +136,8 @@ function deleteIgnoredPaths(srcDir: any, paths: any) {
   }
 }
 
+// TODO: NEED TO FIX THE STORIES IN THE STORYBOOK
+// now the main function to find all the stories files and then fetch the snippets from them
 function findAllStoriesFiles(tmpPath: string, docsPath: string) {
   const pattern = "^(?!.*.(stories.tsx|mdx)$).*$"; // RegExp to match the pattern
 
@@ -139,6 +146,7 @@ function findAllStoriesFiles(tmpPath: string, docsPath: string) {
   fetchSnippetsFromFiles(foundFiles);
 }
 
+// actual function to find the files with the pattern i.e. files except stories.tsx and mdx
 function findFilesWithPatternOnPath(startPath: string, pattern: string) {
   const result: any = [];
 
@@ -161,7 +169,140 @@ function findFilesWithPatternOnPath(startPath: string, pattern: string) {
   return result;
 }
 
-// working
+// fetch the actual snippets from the files to be used in the snippets file
+// pseudo code
+// 1. traverse over all the files and find the stories files that don't have extension .stories.tsx or .mdx
+// 2. then find the .stories.tsx file in the same directory
+// 3. find the default exported name from the .tsx file
+// 4. read the .stories.tsx file and get the arguments to make combinations of the props
+// 5. properly format the arguments to make valid json
+// 6. make all the combinations of the props
+// 7. get the snippet from the .tsx file, currently getting return part from the file using regex
+// 8. replace combinations of props in the snippet function
+function fetchSnippetsFromFiles(foundFiles: string[]) {
+  for (let i = 0; i < foundFiles?.length; i++) {
+    const argumentFile = findFileWithExtensionInSameDirectory(
+      foundFiles[i],
+      ".stories.tsx"
+    );
+
+    let argumentFileContent = "";
+    let componentName = "";
+    const snippetFileContent = fs.readFileSync(foundFiles[i], "utf8");
+    const defaultExportedName = fetchDefaultExportedName(snippetFileContent);
+    const importsUsed = fetchImportsUsed(snippetFileContent);
+    if (argumentFile.length !== 0 && defaultExportedName) {
+      componentName = path.basename(argumentFile[0]).split(".")[0];
+      argumentFileContent = getArgumentFileContent(
+        argumentFile[0],
+        componentName
+      );
+      const argumentFileValidJson = makeValidJSON(argumentFileContent);
+      const argumentFileJson = JSON.parse(argumentFileValidJson);
+      const matchedReturnedSnippet =
+        findMatchedReturnedSnippet(snippetFileContent);
+      const allCombinationsOfProps = findAllCombinationProps(
+        argumentFileJson,
+        componentName
+      );
+      replaceCombinationsOfProps(
+        allCombinationsOfProps,
+        matchedReturnedSnippet,
+        defaultExportedName,
+        foundFiles[i],
+        importsUsed
+      );
+    }
+  }
+}
+
+// function to find the file with the extension in the same directory
+function findFileWithExtensionInSameDirectory(
+  filepath: string,
+  extension: string
+) {
+  const directoryPath = path.dirname(filepath);
+
+  try {
+    const matchingFiles = fs
+      .readdirSync(directoryPath)
+      .filter((filename) => filename.endsWith(extension))
+      .map((filename) => path.join(directoryPath, filename));
+
+    return matchingFiles;
+  } catch (error: any) {
+    console.error("Error:", error.message);
+    return [];
+  }
+}
+
+function fetchDefaultExportedName(fileContent: any) {
+  // Use a regular expression to find the default export
+  const defaultExportRegex = /export default\s+(.*?);/s;
+  const defaultExportMatch = fileContent.match(defaultExportRegex);
+
+  if (defaultExportMatch) {
+    return defaultExportMatch[1].trim();
+  } else {
+    console.log("Default export not found.");
+  }
+}
+
+function fetchImportsUsed(fileContent: any) {
+  const importDetails: any = [];
+  const ast = parser.parse(fileContent, {
+    sourceType: "module",
+    plugins: ["jsx", "typescript"],
+  });
+
+  traverse(ast, {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    ImportDeclaration(path) {
+      const { specifiers, source } = path.node;
+      const importFrom = source.value;
+
+      specifiers.forEach((specifier: any) => {
+        const importName = specifier?.imported?.name || specifier?.local?.name;
+        const importType =
+          specifier.type === "ImportDefaultSpecifier" ||
+          specifier.local.name === "default"
+            ? "default"
+            : "named";
+        const importAs =
+          specifier.type === "ImportDefaultSpecifier" ||
+          specifier.local.name === importName
+            ? undefined
+            : specifier.local.name;
+
+        importDetails.push({
+          importName,
+          importType,
+          importAs,
+          importFrom,
+        });
+      });
+    },
+  });
+
+  return importDetails;
+}
+
+// function to get the argument file content
+function getArgumentFileContent(argumentFilePath: any, componentName: any) {
+  const content = fs.readFileSync(argumentFilePath, "utf8");
+  const pattern = new RegExp(
+    `const ${componentName}Meta: ComponentMeta<typeof ${componentName}> = ({[\\s\\S]*?});`
+  );
+  const match = content.match(pattern);
+  if (match) {
+    const metaJson = match[1];
+    return metaJson;
+  }
+  return "";
+}
+
+// TODO: NEED TO FIX THIS FUNCTION
+// make a valid json from js object
 function makeValidJSON(input: string): string {
   const jsonStringWithQuotes = input.replace(
     /'([^']+)'|"([^"]+)"/g,
@@ -187,60 +328,29 @@ function makeValidJSON(input: string): string {
   return validJSON;
 }
 
-// function fixComponentValue(input: string, componentName: string): string {
-//   // Add quotes around component value
-//   const fixedComponent = input.replace(
-//     new RegExp(`(component:\\s*)(${componentName})(\\s*,|\\n|\\s*})`, "g"),
-//     '$1"$2"$3'
-//   );
-
-//   return fixedComponent;
-// }
-
-function fetchSnippetsFromFiles(foundFiles: string[]) {
-  for (let i = 0; i < foundFiles?.length; i++) {
-    const argumentFile = findFileWithExtensionInSameDirectory(
-      foundFiles[i],
-      ".stories.tsx"
-    );
-
-    let argumentFileContent = "";
-    let componentName = "";
-    const snippetFileContent = fs.readFileSync(foundFiles[i], "utf8");
-    const defaultExportedName = fetchDefaultExportedName(snippetFileContent);
-    if (argumentFile.length !== 0 && defaultExportedName) {
-      componentName = path.basename(argumentFile[0]).split(".")[0];
-      argumentFileContent = getArgumentFileContent(
-        argumentFile[0],
-        componentName
-      );
-      const argumentFileValidJson = makeValidJSON(argumentFileContent);
-      const argumentFileJson = JSON.parse(argumentFileValidJson);
-      const matchedReturnedSnippet =
-        findMatchedReturnedSnippet(snippetFileContent);
-      const allCombinationsOfProps = findAllCombinationProps(
-        argumentFileJson,
-        componentName
-      );
-      findAllCombinationsAndReplaceProps(
-        allCombinationsOfProps,
-        matchedReturnedSnippet,
-        defaultExportedName,
-        foundFiles[i]
-      );
-    }
-  }
+function findMatchedReturnedSnippet(fileContent: any) {
+  // Use the match method to find the first match
+  const pattern = /return\s*\(([\s\S]*?)\);/;
+  return fileContent.match(pattern)?.length > 1
+    ? fileContent.match(pattern)[1]
+    : "";
 }
 
-function findAllCombinationsAndReplaceProps(
+// replace combinations of props in the snippet
+// pseudo code
+// 1. loop over all the combinations of props
+// 2. create speaded props string from the combination
+// 3. replace the spreaded props string in the snippet
+// 4. save the snippet in the snippets file
+function replaceCombinationsOfProps(
   combinations: any,
   snippet: string,
   defaultExportedNameInSnippet: string,
-  filePath: string
+  filePath: string,
+  importsUsed: any
 ) {
   for (const data in combinations) {
     const spreadedPropsString = convertToString(combinations[data]);
-    // console.log("***", spreadedPropsString, "***");
     const replacedPropSnippet = snippet.replace(
       `{...props}`,
       spreadedPropsString
@@ -249,22 +359,27 @@ function findAllCombinationsAndReplaceProps(
       data,
       replacedPropSnippet,
       defaultExportedNameInSnippet,
-      filePath
+      filePath,
+      importsUsed
     );
   }
 }
+
+// save the snippet in the snippets file
+// pseudo code
+// type of data to be saved in the snippets file
+// { "defaultExportedName + combinationDataKey" :{ completion"defaultExportedName + combinationDataKey",imports:"", template:"snippet" } }
 
 function saveDataToSnippets(
   combinationDataKey: any,
   combinationSnippet: any,
   defaultExportedName: any,
-  file: any
+  file: any,
+  importsUsed: any
 ) {
-  // const fileName = path.basename(file, ".tsx");
-
   const newComponent = {
     completion: defaultExportedName + combinationDataKey,
-    imports: ["NewComponent"],
+    imports: importsUsed,
     template: combinationSnippet,
   };
 
@@ -275,6 +390,7 @@ function saveDataToSnippets(
   fs.writeFileSync(destinationPath, JSON.stringify(jsonParsed, null, 2));
 }
 
+// convert object to spreaded string
 function convertToString(data: any) {
   if (typeof data !== "object" || Array.isArray(data)) {
     return "Invalid input. Please provide an object.";
@@ -291,6 +407,7 @@ function convertToString(data: any) {
   return convertedString;
 }
 
+// function to find all the combinations of the props
 function findAllCombinationProps(argumentsJson: any, componentName: string) {
   const StoryArgs = argumentsJson;
   const options = StoryArgs.argTypes;
@@ -380,86 +497,4 @@ function generateCombinations(
   } else {
     generateCombinations(combinations, options, index + 1, combination);
   }
-}
-
-function findMatchedReturnedSnippet(fileContent: any) {
-  // Use the match method to find the first match
-  const pattern = /return\s*\(([\s\S]*?)\);/;
-  return fileContent.match(pattern)?.length > 1
-    ? fileContent.match(pattern)[1]
-    : "";
-}
-
-function fetchDefaultExportedName(fileContent: any) {
-  // Use a regular expression to find the default export
-  const defaultExportRegex = /export default\s+(.*?);/s;
-  const defaultExportMatch = fileContent.match(defaultExportRegex);
-
-  if (defaultExportMatch) {
-    return defaultExportMatch[1].trim();
-  } else {
-    console.log("Default export not found.");
-  }
-}
-
-function convertObjectStringToObject(input: string): any {
-  // Remove line breaks and spaces after colons
-  const cleanedInput = input.replace(/:\s+/g, ":");
-
-  // Replace single quotes with double quotes
-  const doubleQuotedInput = cleanedInput.replace(/'/g, '"');
-
-  // Parse the JSON object
-  const parsedObject = JSON.parse(doubleQuotedInput);
-
-  // Convert all values to strings recursively
-  function convertValuesToStrings(obj: any): any {
-    if (typeof obj === "object") {
-      for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
-          if (typeof obj[key] === "object") {
-            obj[key] = convertValuesToStrings(obj[key]);
-          } else {
-            obj[key] = String(obj[key]);
-          }
-        }
-      }
-    }
-    return obj;
-  }
-
-  const convertedObject = convertValuesToStrings(parsedObject);
-  return convertedObject;
-}
-
-function findFileWithExtensionInSameDirectory(
-  filepath: string,
-  extension: string
-) {
-  const directoryPath = path.dirname(filepath);
-
-  try {
-    const matchingFiles = fs
-      .readdirSync(directoryPath)
-      .filter((filename) => filename.endsWith(extension))
-      .map((filename) => path.join(directoryPath, filename));
-
-    return matchingFiles;
-  } catch (error: any) {
-    console.error("Error:", error.message);
-    return [];
-  }
-}
-
-function getArgumentFileContent(argumentFilePath: any, componentName: any) {
-  const content = fs.readFileSync(argumentFilePath, "utf8");
-  const pattern = new RegExp(
-    `const ${componentName}Meta: ComponentMeta<typeof ${componentName}> = ({[\\s\\S]*?});`
-  );
-  const match = content.match(pattern);
-  if (match) {
-    const metaJson = match[1];
-    return metaJson;
-  }
-  return "";
 }

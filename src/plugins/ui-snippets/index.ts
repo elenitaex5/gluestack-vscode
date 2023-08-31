@@ -99,36 +99,38 @@ export class PluginUISnippets implements BasePlugin {
   // Activate the plugin
   activate(context: vscode.ExtensionContext): void {
     console.log("Congratulations, you are in activate of ui-snippets plugin !");
-    context.subscriptions.push(
-      vscode.languages.registerCompletionItemProvider(
-        "javascript",
-        new GluestackProvider(),
-        "g",
-        "s",
-        "-"
-      )
+    // context.subscriptions.push(
+    vscode.languages.registerCompletionItemProvider(
+      "javascript",
+      new GluestackProvider(),
+      "g",
+      "s",
+      "-"
     );
+    // );
 
-    let authCommand = vscode.commands.registerCommand(
-      "gluestack-vscode.handleInsertImport",
-      async () => {
-        context.subscriptions.push(
-          vscode.commands.registerCommand(
-            "gluestack-vscode.handleInsertImport",
-            handleInsertImport
-          )
-        );
-      }
-    );
+    vscode.commands.executeCommand("editor.action.addCommentLine");
 
-    let helloCommand = vscode.commands.registerCommand(
-      "gluestack-vscode.helloWorld",
-      () => {
-        vscode.window.showInformationMessage(
-          "Hello Meenu!!! Test World from gluestack-vscode!"
-        );
-      }
-    );
-    context.subscriptions.push(helloCommand, authCommand);
+    // let authCommand = vscode.commands.registerCommand(
+    //   "gluestack-vscode.handleInsertImport",
+    //   async () => {
+    //     context.subscriptions.push(
+    //       vscode.commands.registerCommand(
+    //         "gluestack-vscode.handleInsertImport",
+    //         handleInsertImport
+    //       )
+    //     );
+    //   }
+    // );
+
+    // let helloCommand = vscode.commands.registerCommand(
+    //   "gluestack-vscode.helloWorld",
+    //   () => {
+    //     vscode.window.showInformationMessage(
+    //       "Hello Meenu!!! Test World from gluestack-vscode!"
+    //     );
+    //   }
+    // );
+    // context.subscriptions.push(helloCommand, authCommand);
   }
 }
