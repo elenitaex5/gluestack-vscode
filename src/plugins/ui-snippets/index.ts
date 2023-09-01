@@ -15,31 +15,33 @@ export class GluestackProvider implements vscode.CompletionItemProvider {
       .text.substring(0, position.character);
 
     if (!linePrefix.endsWith("gs-")) {
-      // @ts-ignore
-      return undefined;
+      return Promise.resolve([]);
     }
 
-    // Compute the start position of "gs-"
-    const startPos = position.translate(0, -3); // Move 3 characters to the left
+    const startPos = position.translate(0, -3);
 
-    // Generate completion items from the structured object
-    const completionItems = Object.values(COMPONENT_COMPLETIONS).map(
-      (component) => {
+    const completionItems = Object.entries(COMPONENT_COMPLETIONS).map(
+      ([snippetName, component]) => {
         const completionItem = new vscode.CompletionItem(
-          component.completion,
+          snippetName,
           vscode.CompletionItemKind.Class
         );
-        completionItem.insertText = component.template;
+        completionItem.insertText = new vscode.SnippetString(
+          component.template
+        );
         completionItem.additionalTextEdits = [
           vscode.TextEdit.replace(new vscode.Range(startPos, position), ""),
         ];
-
+        completionItem.command = {
+          command: "extension.addImports",
+          title: "Add Imports",
+          arguments: [component.imports],
+        };
         return completionItem;
       }
     );
 
-    // @ts-ignore
-    return completionItems;
+    return Promise.resolve(completionItems);
   }
 }
 
@@ -93,14 +95,61 @@ export class PluginUISnippets implements BasePlugin {
   }
 
   // Activate the plugin
-  activate(context: vscode.ExtensionContext): void {
-    console.log("Congratulations, you are in activate of ui-snippets plugin !");
-    vscode.languages.registerCompletionItemProvider(
-      "javascript",
-      new GluestackProvider(),
-      "g",
-      "s",
-      "-"
+  activate(context: vscode.ExtensionContext) {
+    console.log("Congratulations, you are in activate of ui-snippets plugin!");
+
+    // Register the GluestackProvider as a completion item provider
+    context.subscriptions.push(
+      vscode.languages.registerCompletionItemProvider(
+        ["typescript", "typescriptreact", "javascript", "javascriptreact"],
+        new GluestackProvider(),
+        "g",
+        "s",
+        "-"
+      )
+    );
+
+    // Register the command to add imports
+    context.subscriptions.push(
+      vscode.commands.registerCommand("extension.addImports", (imports) => {
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+          const document = editor.document;
+
+          // Group imports by their import source (from clause)
+          const groupedImports: any = {};
+          imports.forEach((importInfo: any) => {
+            const source = importInfo.importFrom;
+            if (!groupedImports[source]) {
+              groupedImports[source] = [];
+            }
+            groupedImports[source].push(importInfo);
+          });
+
+          // Generate batched import statements
+          const importStatements = Object.entries(groupedImports)
+            .map(([source, imports]: any) => {
+              const importText = imports.map((importInfo: any) => {
+                if (importInfo.importType === "default") {
+                  return `${importInfo.importName}`;
+                } else {
+                  return `${importInfo.importName}`;
+                }
+              });
+              return `import { ${importText.join(", ")} } from "${source}";`;
+            })
+            .join("\n");
+
+          // Create a workspace edit and apply it to add the batched import statements
+          const edit = new vscode.WorkspaceEdit();
+          edit.insert(
+            document.uri,
+            new vscode.Position(0, 0),
+            importStatements + "\n\n"
+          );
+          vscode.workspace.applyEdit(edit);
+        }
+      })
     );
   }
 }
