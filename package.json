@@ -2,7 +2,7 @@
   "name": "gluestack-vscode",
   "displayName": "gluestack",
   "description": "The official gluestack VSCode plugin for the gluestack ecosystem.",
-  "version": "0.0.4",
+  "version": "0.1.0",
   "icon": "images/logo.png",
   "repository": "https://github.com/gluestack/gluestack-vscode",
   "engines": {
