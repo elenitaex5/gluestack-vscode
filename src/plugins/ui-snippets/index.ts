@@ -33,11 +33,7 @@ export class GluestackProvider implements vscode.CompletionItemProvider {
         completionItem.additionalTextEdits = [
           vscode.TextEdit.replace(new vscode.Range(startPos, position), ""),
         ];
-        completionItem.command = {
-          command: "gluestack-vscode.handleInsertImport",
-          title: "Insert Import",
-          arguments: [component.imports],
-        };
+
         return completionItem;
       }
     );
@@ -47,35 +43,35 @@ export class GluestackProvider implements vscode.CompletionItemProvider {
   }
 }
 
-function handleInsertImport(imports: string[]) {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor) {
-    return;
-  }
+// function handleInsertImport(imports: string[]) {
+//   const editor = vscode.window.activeTextEditor;
+//   if (!editor) {
+//     return;
+//   }
 
-  const document = editor.document;
-  let importStatement = `import { ${imports.join(
-    ", "
-  )} } from "@gluestack-ui/react";\n`;
+//   const document = editor.document;
+//   let importStatement = `import { ${imports.join(
+//     ", "
+//   )} } from "@gluestack-ui/react";\n`;
 
-  // Check if import from @gluestack-ui/react already exists
-  for (let line = 0; line < document.lineCount; line++) {
-    const lineText = document.lineAt(line).text;
-    if (lineText.includes("@gluestack-ui/react")) {
-      // If import already exists, modify the existing line
-      importStatement = lineText.replace("}", `, ${imports.join(", ")} }`);
-      editor.edit((edit) => {
-        edit.replace(document.lineAt(line).range, importStatement);
-      });
-      return;
-    }
-  }
+//   // Check if import from @gluestack-ui/react already exists
+//   for (let line = 0; line < document.lineCount; line++) {
+//     const lineText = document.lineAt(line).text;
+//     if (lineText.includes("@gluestack-ui/react")) {
+//       // If import already exists, modify the existing line
+//       importStatement = lineText.replace("}", `, ${imports.join(", ")} }`);
+//       editor.edit((edit) => {
+//         edit.replace(document.lineAt(line).range, importStatement);
+//       });
+//       return;
+//     }
+//   }
 
-  // If no existing import, add it to the top
-  editor.edit((edit) => {
-    edit.insert(new vscode.Position(0, 0), importStatement);
-  });
-}
+//   // If no existing import, add it to the top
+//   editor.edit((edit) => {
+//     edit.insert(new vscode.Position(0, 0), importStatement);
+//   });
+// }
 
 export class PluginUISnippets implements BasePlugin {
   pluginId: string = "PluginUISnippets";
@@ -99,7 +95,6 @@ export class PluginUISnippets implements BasePlugin {
   // Activate the plugin
   activate(context: vscode.ExtensionContext): void {
     console.log("Congratulations, you are in activate of ui-snippets plugin !");
-    // context.subscriptions.push(
     vscode.languages.registerCompletionItemProvider(
       "javascript",
       new GluestackProvider(),
@@ -107,30 +102,5 @@ export class PluginUISnippets implements BasePlugin {
       "s",
       "-"
     );
-    // );
-
-    vscode.commands.executeCommand("editor.action.addCommentLine");
-
-    // let authCommand = vscode.commands.registerCommand(
-    //   "gluestack-vscode.handleInsertImport",
-    //   async () => {
-    //     context.subscriptions.push(
-    //       vscode.commands.registerCommand(
-    //         "gluestack-vscode.handleInsertImport",
-    //         handleInsertImport
-    //       )
-    //     );
-    //   }
-    // );
-
-    // let helloCommand = vscode.commands.registerCommand(
-    //   "gluestack-vscode.helloWorld",
-    //   () => {
-    //     vscode.window.showInformationMessage(
-    //       "Hello Meenu!!! Test World from gluestack-vscode!"
-    //     );
-    //   }
-    // );
-    // context.subscriptions.push(helloCommand, authCommand);
   }
 }

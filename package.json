@@ -1,6 +1,6 @@
 {
   "name": "gluestack-vscode",
-  "displayName": "gluestack-vscode",
+  "displayName": "gluestack",
   "description": "The official gluestack VSCode plugin for the gluestack ecosystem.",
   "version": "0.0.1",
   "engines": {
@@ -9,19 +9,16 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "publisher": "gluestack",
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "gluestack-vscode.authenticate",
-        "title": "authenticate"
-      },
-      {
-        "command": "gluestack-vscode.helloWorld",
-        "title": "Hello World"
-      }
-    ]
+    "commands": []
   },
   "scripts": {
     "update-snippets": "cd src/plugins/ui-snippets/scripts/ && npx tsc update-snippets.ts  && node update-snippets.js",
