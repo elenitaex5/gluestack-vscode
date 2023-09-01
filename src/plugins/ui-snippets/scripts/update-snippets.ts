@@ -329,11 +329,42 @@ function makeValidJSON(input: string): string {
 }
 
 function findMatchedReturnedSnippet(fileContent: any) {
-  // Use the match method to find the first match
-  const pattern = /return\s*\(([\s\S]*?)\);/;
-  return fileContent.match(pattern)?.length > 1
-    ? fileContent.match(pattern)[1]
-    : "";
+  const ast = parser.parse(fileContent, {
+    sourceType: "module",
+    plugins: ["jsx", "typescript"],
+  });
+
+  let returnStatementCode: string | null = null;
+
+  traverse(ast, {
+    ArrowFunctionExpression(path) {
+      // Find the ArrowFunctionExpression representing the component.
+      if (path.node.params.length > 0) {
+        const firstParam = path.node.params[0];
+        if (firstParam.type === "ObjectPattern") {
+          // Check if the first parameter is an ObjectPattern (props).
+          const returnStatement = path
+            .get("body")
+            .get("body")
+            .find((node) => {
+              return node.type === "ReturnStatement";
+            });
+
+          if (returnStatement) {
+            // Extract the code inside the return statement.
+            returnStatementCode =
+              returnStatement.get("argument").toString() || null;
+          }
+        }
+      }
+    },
+  });
+
+  if (returnStatementCode) {
+    // Print the extracted code.
+    return returnStatementCode;
+  }
+  return "";
 }
 
 // replace combinations of props in the snippet
