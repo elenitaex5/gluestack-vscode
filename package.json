@@ -4,6 +4,7 @@
   "description": "The official gluestack VSCode plugin for the gluestack ecosystem.",
   "version": "0.0.4",
   "icon": "images/logo.png",
+  "repository": "https://github.com/gluestack/gluestack-vscode",
   "engines": {
     "vscode": "^1.5.0"
   },
