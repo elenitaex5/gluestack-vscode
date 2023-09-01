@@ -3,6 +3,7 @@
   "displayName": "gluestack",
   "description": "The official gluestack VSCode plugin for the gluestack ecosystem.",
   "version": "0.0.2",
+  "icon": "images/logo.png",
   "engines": {
     "vscode": "^1.79.0"
   },
