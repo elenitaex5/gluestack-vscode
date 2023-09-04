@@ -4,6 +4,7 @@ import * as json5 from "json5";
 import { execSync, spawn } from "child_process";
 import * as parser from "@babel/parser";
 import traverse from "@babel/traverse";
+import generate from "@babel/generator";
 
 const currPath = path.resolve(__dirname);
 const rootPath = path.resolve(path.join(currPath, "..", "..", "..", ".."));
@@ -189,8 +190,24 @@ function fetchSnippetsFromFiles(foundFiles: string[]) {
     let argumentFileContent = "";
     let componentName = "";
     const snippetFileContent = fs.readFileSync(foundFiles[i], "utf8");
-    const defaultExportedName = fetchDefaultExportedName(snippetFileContent);
+    const defaultExportedName: any =
+      fetchDefaultExportedName(snippetFileContent);
+
+    let defaultExportedComponent: any = "";
+    let variableStatements: any = "";
     const importsUsed = fetchImportsUsed(snippetFileContent);
+
+    if (defaultExportedName) {
+      defaultExportedComponent = extractdefaultExportedComponent(
+        snippetFileContent,
+        defaultExportedName
+      );
+
+      variableStatements = findVariableStatements(
+        defaultExportedComponent,
+        defaultExportedName
+      );
+    }
     if (argumentFile.length !== 0 && defaultExportedName) {
       componentName = path.basename(argumentFile[0]).split(".")[0];
       argumentFileContent = getArgumentFileContent(
@@ -199,8 +216,9 @@ function fetchSnippetsFromFiles(foundFiles: string[]) {
       );
       const argumentFileValidJson = makeValidJSON(argumentFileContent);
       const argumentFileJson = JSON.parse(argumentFileValidJson);
-      const matchedReturnedSnippet =
-        findMatchedReturnedSnippet(snippetFileContent);
+      const matchedReturnedSnippet = findMatchedReturnedSnippet(
+        defaultExportedComponent
+      );
       const allCombinationsOfProps = findAllCombinationProps(
         argumentFileJson,
         componentName
@@ -210,7 +228,8 @@ function fetchSnippetsFromFiles(foundFiles: string[]) {
         matchedReturnedSnippet,
         defaultExportedName,
         foundFiles[i],
-        importsUsed
+        importsUsed,
+        variableStatements
       );
     }
   }
@@ -237,14 +256,28 @@ function findFileWithExtensionInSameDirectory(
 }
 
 function fetchDefaultExportedName(fileContent: any) {
-  // Use a regular expression to find the default export
-  const defaultExportRegex = /export default\s+(.*?);/s;
-  const defaultExportMatch = fileContent.match(defaultExportRegex);
+  const ast = parser.parse(fileContent, {
+    sourceType: "module", // Specify 'module' for ES modules or 'script' for non-module code
+    plugins: ["jsx", "typescript"],
+  });
 
-  if (defaultExportMatch) {
-    return defaultExportMatch[1].trim();
+  let exportAssignmentName = null;
+
+  // Traverse the AST to find the export assignment
+  traverse(ast, {
+    ExportDefaultDeclaration(path) {
+      // Check if it's an export default declaration with an Identifier
+      if (path.node.declaration.type === "Identifier") {
+        exportAssignmentName = path.node.declaration.name;
+        // Stop traversal as we found the export assignment
+        path.stop();
+      }
+    },
+  });
+  if (exportAssignmentName === null) {
+    console.log("No export assignment found in the code.");
   } else {
-    console.log("Default export not found.");
+    return exportAssignmentName;
   }
 }
 
@@ -287,7 +320,74 @@ function fetchImportsUsed(fileContent: any) {
   return importDetails;
 }
 
-// function to get the argument file content
+function extractdefaultExportedComponent(
+  fileContent: any,
+  defaultExportedName: string
+) {
+  // Parse the code using the Babel parser
+  const ast = parser.parse(fileContent, {
+    sourceType: "module",
+    plugins: ["jsx", "typescript"],
+  });
+
+  let declarationStatement: any = null;
+  // Traverse the AST to find the variable declaration
+  traverse(ast, {
+    VariableDeclaration(path) {
+      const declarations: any = path.node.declarations;
+      for (const declaration of declarations) {
+        if (declaration.id.name === defaultExportedName) {
+          declarationStatement = path.toString();
+          path.stop();
+          break;
+        }
+      }
+    },
+    FunctionDeclaration(path) {
+      if (path.node.id && path.node.id.name === defaultExportedName) {
+        declarationStatement = path.toString();
+        path.stop();
+      }
+    },
+  });
+
+  return declarationStatement;
+}
+
+function findVariableStatements(
+  defaultExportedComponent: any,
+  defaultExportedName: string
+) {
+  const ast = parser.parse(defaultExportedComponent, {
+    sourceType: "module",
+    plugins: ["jsx", "typescript"],
+  });
+
+  const variableStatements: any = [];
+
+  traverse(ast, {
+    VariableDeclaration(path) {
+      // Get the kind of declaration (let, const, var)
+      const declarationKind = path.node.kind;
+
+      // Loop through the declarations within this statement
+      path.node.declarations.forEach((declaration: any) => {
+        // Extract the entire variable declaration as it is
+        const variableDeclaration = generate(declaration).code;
+
+        // Check if the variable declaration contains the defaultExportedName
+        if (!variableDeclaration.includes(defaultExportedName)) {
+          // Push the entire variable declaration to the list
+          variableStatements.push(variableDeclaration);
+        }
+      });
+    },
+  });
+
+  if (variableStatements.length > 0) return variableStatements.join("\n");
+  return "";
+}
+
 function getArgumentFileContent(argumentFilePath: any, componentName: any) {
   const content = fs.readFileSync(argumentFilePath, "utf8");
   const pattern = new RegExp(
@@ -378,7 +478,8 @@ function replaceCombinationsOfProps(
   snippet: string,
   defaultExportedNameInSnippet: string,
   filePath: string,
-  importsUsed: any
+  importsUsed: any,
+  variableStatements: any
 ) {
   for (const data in combinations) {
     const spreadedPropsString = convertToString(combinations[data]);
@@ -391,7 +492,8 @@ function replaceCombinationsOfProps(
       replacedPropSnippet,
       defaultExportedNameInSnippet,
       filePath,
-      importsUsed
+      importsUsed,
+      variableStatements
     );
   }
 }
@@ -406,12 +508,14 @@ function saveDataToSnippets(
   combinationSnippet: any,
   defaultExportedName: any,
   file: any,
-  importsUsed: any
+  importsUsed: any,
+  variableStatements: any
 ) {
   const newComponent = {
     completion: defaultExportedName + combinationDataKey,
     imports: importsUsed,
     template: combinationSnippet,
+    variableStatements: variableStatements,
   };
 
   let fileContent = fs.readFileSync(destinationPath, "utf8");
