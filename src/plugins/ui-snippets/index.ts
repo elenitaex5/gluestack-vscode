@@ -45,36 +45,6 @@ export class GluestackProvider implements vscode.CompletionItemProvider {
   }
 }
 
-// function handleInsertImport(imports: string[]) {
-//   const editor = vscode.window.activeTextEditor;
-//   if (!editor) {
-//     return;
-//   }
-
-//   const document = editor.document;
-//   let importStatement = `import { ${imports.join(
-//     ", "
-//   )} } from "@gluestack-ui/react";\n`;
-
-//   // Check if import from @gluestack-ui/react already exists
-//   for (let line = 0; line < document.lineCount; line++) {
-//     const lineText = document.lineAt(line).text;
-//     if (lineText.includes("@gluestack-ui/react")) {
-//       // If import already exists, modify the existing line
-//       importStatement = lineText.replace("}", `, ${imports.join(", ")} }`);
-//       editor.edit((edit) => {
-//         edit.replace(document.lineAt(line).range, importStatement);
-//       });
-//       return;
-//     }
-//   }
-
-//   // If no existing import, add it to the top
-//   editor.edit((edit) => {
-//     edit.insert(new vscode.Position(0, 0), importStatement);
-//   });
-// }
-
 export class PluginUISnippets implements BasePlugin {
   pluginId: string = "PluginUISnippets";
 
