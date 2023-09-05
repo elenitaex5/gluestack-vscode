@@ -378,13 +378,15 @@ function findVariableStatements(
         // Check if the variable declaration contains the defaultExportedName
         if (!variableDeclaration.includes(defaultExportedName)) {
           // Push the entire variable declaration to the list
-          variableStatements.push(variableDeclaration);
+          variableStatements.push(declarationKind + " " + variableDeclaration);
         }
       });
     },
   });
 
-  if (variableStatements.length > 0) return variableStatements.join("\n");
+  if (variableStatements.length > 0) {
+    return variableStatements.join("\n");
+  }
   return "";
 }
 
