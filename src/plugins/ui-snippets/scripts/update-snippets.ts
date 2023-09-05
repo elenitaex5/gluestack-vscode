@@ -513,8 +513,16 @@ function saveDataToSnippets(
   importsUsed: any,
   variableStatements: any
 ) {
+  let newCombinationDataKey = combinationDataKey;
+  let tempCombinationDataKey = combinationDataKey.split("-");
+
+  if (tempCombinationDataKey.length > 1) {
+    tempCombinationDataKey.shift(); // Remove the first element
+    newCombinationDataKey = tempCombinationDataKey.join("-");
+  }
+
   const newComponent = {
-    completion: defaultExportedName + combinationDataKey,
+    completion: defaultExportedName + "-" + newCombinationDataKey,
     imports: importsUsed,
     template: combinationSnippet,
     variableStatements: variableStatements,
@@ -522,7 +530,7 @@ function saveDataToSnippets(
 
   let fileContent = fs.readFileSync(destinationPath, "utf8");
   let jsonParsed = json5.parse(fileContent);
-  jsonParsed[defaultExportedName + combinationDataKey] = newComponent;
+  jsonParsed[defaultExportedName + "-" + newCombinationDataKey] = newComponent;
   // read the data from the file and then push this new data to it
   fs.writeFileSync(destinationPath, JSON.stringify(jsonParsed, null, 2));
 }
