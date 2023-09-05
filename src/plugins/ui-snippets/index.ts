@@ -145,50 +145,128 @@ export class PluginUISnippets implements BasePlugin {
     }
   }
 
+  // Start the traversal by calling the function with the root of the AST
+
   private async addVariableStatements(
     variableStatements: string
   ): Promise<void> {
-    // const editor = vscode.window.activeTextEditor;
-    // if (editor) {
-    //   const document = editor.document;
-    //   const selection = editor.selection;
-    //   const code = document.getText();
-    //   const ast = parser.parse(code, {
-    //     sourceType: "module", // or 'script' for non-module code
-    //     plugins: ["jsx", "typescript"], // Include any necessary plugins
-    //   });
-    //   const cursorPosition = selection.active;
-    //   const documentCursorOffset = document.offsetAt(cursorPosition) - 1;
-    //   let nodeloc = null;
-    //   let foundNode: any = null;
-    //   let closestNode = null;
-    //   let closestDistance = Infinity;
-    //   let returnStatementParent = null;
-    //   let parentPathOfReturnStatement = null;
-    //   traverse(ast, {
-    //     enter(path: any) {
-    //       // Calculate the start and end indices of the current node in the source code
-    //       const { start, end } = path.node.loc;
-    //       // Check if the end index falls within the current node's range
-    //       if (end.index >= documentCursorOffset) {
-    //         foundNode = path.node;
-    //       }
-    //     },
-    //   });
-    //   console.log("foundNode", foundNode);
-    //   traverse(ast, {
-    //     ReturnStatement: function (path: any) {
-    //       // Check if the target node is inside this ReturnStatement
-    //       if (
-    //         path.node.loc.start <= foundNode.loc.start &&
-    //         path.node.loc.end >= foundNode.loc.end
-    //       ) {
-    //         returnStatementParent = path.node;
-    //         parentPathOfReturnStatement = path.parent;
-    //         path.stop(); // Stop traversal since we found the ReturnStatement
-    //       }
-    //     },
-    //   });
-    // }
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      const document = editor.document;
+      const code = document.getText();
+
+      const selection = editor.selection;
+      const cursorPosition = selection.active;
+      const documentCursorOffset = document.offsetAt(cursorPosition) - 1;
+      let foundNode: any = null;
+      let functionNotFound = true;
+
+      const ast = parser.parse(code, {
+        sourceType: "module", // Specify 'module' for ES modules or 'script' for non-module code
+        plugins: ["jsx", "typescript"],
+      });
+
+      // find the node that the cursor is in
+      traverse(ast, {
+        enter(path: any) {
+          // Calculate the start and end indices of the current node in the source code
+          const { end } = path.node.loc;
+          // Check if the end index falls within the current node's range
+          if (end.index >= documentCursorOffset) {
+            foundNode = path.node;
+          }
+        },
+      });
+
+      const functionNode = traverseNode(ast, foundNode);
+
+      if (!functionNode) {
+        return;
+      }
+
+      // Traverse the AST to find the target node (e.g., a function declaration)
+      traverse(ast, {
+        ArrowFunctionExpression(path) {
+          // You can conditionally select the node where you want to prepend text.
+          // For example, here we are targeting the "myFunction" function.
+          if (path.node === functionNode) {
+            // Add text to the function's body
+            // functionNotFound = false;
+            prependTextToNode(path.node, variableStatements);
+          } else {
+            functionNotFound = true;
+          }
+        },
+      });
+
+      // if (functionNotFound) {
+      //   prependTextToNode(ast, variableStatements);
+      // }
+
+      const modifiedCode = generate(ast).code;
+
+      const edit = new vscode.WorkspaceEdit();
+      const range = new vscode.Range(
+        new vscode.Position(0, 0), // Start position
+        document.positionAt(document.getText().length) // End position (line count represents the entire file)
+      );
+
+      edit.replace(document.uri, range, modifiedCode);
+
+      await vscode.workspace.applyEdit(edit);
+    }
   }
+}
+
+function prependTextToNode(node: any, textToPrepend: any) {
+  if (node.body.body) {
+    // Add the text to the beginning of the body
+    node.body.body.unshift(parser.parse(textToPrepend).program.body[0]);
+  }
+}
+
+function traverseNode(node: any, targetNode: any) {
+  if (!node) {
+    return null;
+  }
+
+  if (node === targetNode) {
+    return null; // We don't want to return the current node itself
+  }
+
+  for (const key in node) {
+    if (node.hasOwnProperty(key) && typeof node[key] === "object") {
+      const result: any = traverseNode(node[key], targetNode);
+      if (result) {
+        return result; // Return the last ancestor ArrowFunctionExpression found
+      }
+    }
+  }
+
+  if (node.type === "ArrowFunctionExpression") {
+    if (hasDescendant(node, targetNode)) {
+      return node; // Return the ArrowFunctionExpression with the descendant
+    }
+    return null;
+  }
+
+  // If no matching ancestor is found, return null
+  return null;
+}
+
+// improve later for particular descendant
+function hasDescendant(node: any, targetNode: any) {
+  if (node === targetNode) {
+    return true;
+  }
+
+  for (const key in node) {
+    if (node.hasOwnProperty(key) && typeof node[key] === "object") {
+      if (hasDescendant(node[key], targetNode)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }

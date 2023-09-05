@@ -5,7 +5,7 @@
       "id": "ui",
       "gitUrl": "https://github.com/gluestack/gluestack-ui.git",
       "docsPath": "example/storybook/src/components",
-      "branchName": "vscode-extension",
+      "branchName": "main",
       "repoName": "gluestack-ui",
       "rootDocs": false,
       "ignoredPaths": ["hooks/useDarkMode.web.ts"],
