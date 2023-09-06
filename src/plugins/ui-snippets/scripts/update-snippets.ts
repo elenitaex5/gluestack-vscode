@@ -58,11 +58,11 @@ function createSnippetsFile(destinationPath: string) {
 }
 
 function updateSnippetsFromStorybook() {
-  // if (fs.existsSync(reposDirectoryPath)) {
-  //   cleanUp(reposDirectoryPath);
-  // }
-  // createFolders(reposDirectoryPath);
-  // cloneRepoSrc();
+  if (fs.existsSync(reposDirectoryPath)) {
+    cleanUp(reposDirectoryPath);
+  }
+  createFolders(reposDirectoryPath);
+  cloneRepoSrc();
   findAllStoriesFiles(reposDirectoryPath, docsPath);
 }
 
@@ -223,6 +223,7 @@ function fetchSnippetsFromFiles(foundFiles: string[]) {
         argumentFileJson,
         componentName
       );
+
       replaceCombinationsOfProps(
         allCombinationsOfProps,
         matchedReturnedSnippet,
@@ -557,10 +558,23 @@ function replaceCombinationsOfProps(
 ) {
   for (const data in combinations) {
     const spreadedPropsString = convertToString(combinations[data]);
-    const replacedPropSnippet = snippet.replace(
+    let replacedPropSnippet = snippet.replace(
       `{...props}`,
       spreadedPropsString
     );
+    // replace props. with proper variable
+    if (replacedPropSnippet.includes("props.")) {
+      // write function to find string after props. in snippet and then replace it with the combination[data]. matching key
+      replacedPropSnippet = replacePropsWithMatchingKey(
+        replacedPropSnippet,
+        combinations[data]
+      );
+    }
+    // if it still has props. somewhere , then add $ there
+    if (replacedPropSnippet.includes("props.")) {
+      // write function to find string after props. in snippet and then replace it with the combination[data]. matching key
+      replacedPropSnippet = addDollarToUnresolvedProps(replacedPropSnippet);
+    }
     saveDataToSnippets(
       data,
       replacedPropSnippet,
@@ -570,6 +584,38 @@ function replaceCombinationsOfProps(
       variableStatements
     );
   }
+}
+
+function replacePropsWithMatchingKey(inputSnippet: string, data: any): string {
+  // Regular expression to match "{props.propertyName}" placeholders
+  const propRegex = /{props\.(\w+)}/g;
+
+  // Replace all matches using a callback function
+  const replacedSnippet = inputSnippet.replace(propRegex, (match, propName) => {
+    // Check if the propName exists in the data object
+    if (data.hasOwnProperty(propName)) {
+      // Replace with the corresponding value from the data object, keeping the curly braces
+      return `{${data[propName]}}`;
+    } else {
+      // If propName is not found in data, keep the original match
+      return match;
+    }
+  });
+
+  return replacedSnippet;
+}
+
+function addDollarToUnresolvedProps(inputSnippet: string) {
+  // Regular expression to match "{props.propertyName}" placeholders
+  const propRegex = /{props\.(\w+)}/g;
+
+  // Replace all matches using a callback function
+  const replacedSnippet = inputSnippet.replace(propRegex, (match, propName) => {
+    // Replace with the corresponding value from the data object, keeping the curly braces
+    return `"$1"`;
+  });
+
+  return replacedSnippet;
 }
 
 // save the snippet in the snippets file
@@ -613,15 +659,10 @@ function convertToString(data: any) {
     return "Invalid input. Please provide an object.";
   }
 
-  const convertedParts = [];
-  for (const key in data) {
-    if (data.hasOwnProperty(key)) {
-      convertedParts.push(`${key}="${data[key]}"`);
-    }
-  }
-
-  const convertedString = convertedParts.join(" ");
-  return convertedString;
+  const spreadedObjectString = Object.entries(data)
+    .map(([key, value]) => `${key}={${JSON.stringify(value)}}`)
+    .join(" ");
+  return spreadedObjectString;
 }
 
 // function to find all the combinations of the props
@@ -636,9 +677,13 @@ function findAllCombinationProps(argumentsJson: any, componentName: string) {
     "isPressed",
     "isFocused",
     "isFocusVisible",
+  ];
+
+  const FUNCTIONAL_STATES = [
     "isDisabled",
     "isInvalid",
     "isReadonly",
+    "isReadOnly",
     "isRequired",
   ];
 
@@ -678,7 +723,11 @@ function findAllCombinationProps(argumentsJson: any, componentName: string) {
         prop !== "state" &&
         StoryArgs.args[prop] !== x[prop]
       ) {
-        name += "-" + x[prop];
+        if (FUNCTIONAL_STATES.includes(prop)) {
+          name += "-" + prop;
+        } else {
+          name += "-" + x[prop];
+        }
       }
     });
     combinationData[name] = x;
