@@ -196,7 +196,6 @@ function fetchSnippetsFromFiles(foundFiles: string[]) {
     let defaultExportedComponent: any = "";
     let variableStatements: any = "";
     const importsUsed = importsToArray(snippetFileContent);
-
     if (defaultExportedName) {
       defaultExportedComponent = extractdefaultExportedComponent(
         snippetFileContent,
