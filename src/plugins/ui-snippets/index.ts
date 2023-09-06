@@ -115,25 +115,12 @@ export class PluginUISnippets implements BasePlugin {
     if (editor) {
       const document = editor.document;
 
-      const groupedImports: Record<string, any[]> = {};
-      imports.forEach((importInfo: any) => {
-        const source = importInfo.importFrom;
-        if (!groupedImports[source]) {
-          groupedImports[source] = [];
-        }
-        groupedImports[source].push(importInfo);
-      });
+      const code = document.getText();
 
-      const importStatements = Object.entries(groupedImports)
-        .map(([source, imports]: [string, any[]]) => {
-          const importText = imports.map((importInfo: any) => {
-            return importInfo.importType === "default"
-              ? importInfo.importName
-              : `${importInfo.importName}`;
-          });
-          return `import { ${importText.join(", ")} } from "${source}";`;
-        })
-        .join("\n");
+      const importsUsed = importsToArray(code);
+      const importsToAdd = findObjectsNotInArray(imports, importsUsed);
+
+      const importStatements = arrayToImports(importsToAdd);
 
       const edit = new vscode.WorkspaceEdit();
       edit.insert(
@@ -269,4 +256,133 @@ function hasDescendant(node: any, targetNode: any) {
   }
 
   return false;
+}
+
+function importsToArray(fileContent: any) {
+  const importDetails: any = [];
+  const ast = parser.parse(fileContent, {
+    sourceType: "module",
+    plugins: ["jsx", "typescript"],
+  });
+
+  traverse(ast, {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    ImportDeclaration(path) {
+      const { specifiers, source } = path.node;
+      const importFrom = source.value;
+
+      specifiers.forEach((specifier: any) => {
+        const importName = specifier?.imported?.name || specifier?.local?.name;
+        const importType =
+          specifier.type === "ImportDefaultSpecifier" ||
+          specifier.local.name === "default"
+            ? "default"
+            : "named";
+        const importAs =
+          specifier.type === "ImportDefaultSpecifier" ||
+          specifier.local.name === importName
+            ? null
+            : specifier.local.name;
+
+        importDetails.push({
+          importName,
+          importType,
+          importAs,
+          importFrom,
+        });
+      });
+    },
+  });
+
+  return importDetails;
+}
+
+function arrayToImports(importDetails: any): string {
+  const groupedImports: any = {};
+
+  // Group imports by importFrom
+  for (const detail of importDetails) {
+    const { importFrom } = detail;
+    if (!groupedImports[importFrom]) {
+      groupedImports[importFrom] = [];
+    }
+    groupedImports[importFrom].push(detail);
+  }
+
+  const importStrings: string[] = [];
+
+  // Generate import statements for each group
+  for (const importFrom in groupedImports) {
+    const imports = groupedImports[importFrom];
+    const namedImports = imports.filter(
+      (detail: any) => detail.importType === "named"
+    );
+    const defaultImport = imports.find(
+      (detail: any) => detail.importType === "default"
+    );
+
+    if (imports.length === 1) {
+      // Single import, no need to group
+      const [detail] = imports;
+      if (detail.importType === "default") {
+        // Default import
+        importStrings.push(
+          `import ${detail.importAs || detail.importName} from '${importFrom}';`
+        );
+      } else {
+        // Named import
+        const importName = detail.importAs
+          ? `${detail.importName} as ${detail.importAs}`
+          : detail.importName;
+        importStrings.push(`import { ${importName} } from '${importFrom}';`);
+      }
+    } else {
+      // Group multiple imports from the same source
+      const importStatementParts = [];
+
+      if (defaultImport) {
+        // Default import
+        importStatementParts.push(
+          `${defaultImport.importName}${namedImports.length > 0 ? "," : ""}`
+        );
+      }
+
+      if (namedImports.length > 0) {
+        // Named imports
+        const groupedImportNames = namedImports
+          .map((detail: any) =>
+            detail.importAs
+              ? `${detail.importName} as ${detail.importAs}`
+              : detail.importName
+          )
+          .join(", ");
+
+        importStatementParts.push(`{ ${groupedImportNames} }`);
+      }
+
+      importStatementParts.push(`from '${importFrom}';`);
+
+      importStrings.push(`import ${importStatementParts.join(" ")}\n`);
+    }
+  }
+
+  return importStrings.join("");
+}
+
+function findObjectsNotInArray(a1: any, a2: any) {
+  // Use filter to keep objects from a1 that are not in a2
+  const objectsNotInA2 = a1.filter((objA1: any) => {
+    // Use some to check if objA1 is not in a2
+    return !a2.some((objA2: any) => {
+      // Compare objects based on their properties
+      return (
+        objA1.importName === objA2.importName &&
+        objA1.importType === objA2.importType &&
+        objA1.importAs === objA2.importAs &&
+        objA1.importFrom === objA2.importFrom
+      );
+    });
+  });
+
+  return objectsNotInA2;
 }

@@ -1,0 +1,4 @@
+# .prettierignore
+# Ignore formatting for specific files or directories
+src/plugins/ui-snippets/COMPONENT_COMPLETIONS.ts
+src/plugins/ui-snippets/COMPONENT_COMPLETIONS.json

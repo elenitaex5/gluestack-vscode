@@ -195,7 +195,7 @@ function fetchSnippetsFromFiles(foundFiles: string[]) {
 
     let defaultExportedComponent: any = "";
     let variableStatements: any = "";
-    const importsUsed = fetchImportsUsed(snippetFileContent);
+    const importsUsed = importsToArray(snippetFileContent);
 
     if (defaultExportedName) {
       defaultExportedComponent = extractdefaultExportedComponent(
@@ -281,7 +281,7 @@ function fetchDefaultExportedName(fileContent: any) {
   }
 }
 
-function fetchImportsUsed(fileContent: any) {
+function importsToArray(fileContent: any) {
   const importDetails: any = [];
   const ast = parser.parse(fileContent, {
     sourceType: "module",
@@ -304,7 +304,7 @@ function fetchImportsUsed(fileContent: any) {
         const importAs =
           specifier.type === "ImportDefaultSpecifier" ||
           specifier.local.name === importName
-            ? undefined
+            ? null
             : specifier.local.name;
 
         importDetails.push({
@@ -318,6 +318,78 @@ function fetchImportsUsed(fileContent: any) {
   });
 
   return importDetails;
+}
+
+function arrayToImports(importDetails: any): string {
+  const groupedImports: any = {};
+
+  // Group imports by importFrom
+  for (const detail of importDetails) {
+    const { importFrom } = detail;
+    if (!groupedImports[importFrom]) {
+      groupedImports[importFrom] = [];
+    }
+    groupedImports[importFrom].push(detail);
+  }
+
+  const importStrings: string[] = [];
+
+  // Generate import statements for each group
+  for (const importFrom in groupedImports) {
+    const imports = groupedImports[importFrom];
+    const namedImports = imports.filter(
+      (detail: any) => detail.importType === "named"
+    );
+    const defaultImport = imports.find(
+      (detail: any) => detail.importType === "default"
+    );
+
+    if (imports.length === 1) {
+      // Single import, no need to group
+      const [detail] = imports;
+      if (detail.importType === "default") {
+        // Default import
+        importStrings.push(
+          `import ${detail.importAs || detail.importName} from '${importFrom}';`
+        );
+      } else {
+        // Named import
+        const importName = detail.importAs
+          ? `${detail.importName} as ${detail.importAs}`
+          : detail.importName;
+        importStrings.push(`import { ${importName} } from '${importFrom}';`);
+      }
+    } else {
+      // Group multiple imports from the same source
+      const importStatementParts = [];
+
+      if (defaultImport) {
+        // Default import
+        importStatementParts.push(
+          `${defaultImport.importName}${namedImports.length > 0 ? "," : ""}`
+        );
+      }
+
+      if (namedImports.length > 0) {
+        // Named imports
+        const groupedImportNames = namedImports
+          .map((detail: any) =>
+            detail.importAs
+              ? `${detail.importName} as ${detail.importAs}`
+              : detail.importName
+          )
+          .join(", ");
+
+        importStatementParts.push(`{ ${groupedImportNames} }`);
+      }
+
+      importStatementParts.push(`from '${importFrom}';`);
+
+      importStrings.push(`import ${importStatementParts.join(" ")}\n`);
+    }
+  }
+
+  return importStrings.join("");
 }
 
 function extractdefaultExportedComponent(
@@ -436,7 +508,7 @@ function findMatchedReturnedSnippet(fileContent: any) {
     plugins: ["jsx", "typescript"],
   });
 
-  let returnStatementCode: string | null = null;
+  let returnStatementCode: string | null = "";
 
   traverse(ast, {
     ArrowFunctionExpression(path) {
@@ -464,7 +536,7 @@ function findMatchedReturnedSnippet(fileContent: any) {
 
   if (returnStatementCode) {
     // Print the extracted code.
-    return returnStatementCode;
+    return returnStatementCode.replace(/([$])/g, "\\$1");
   }
   return "";
 }
