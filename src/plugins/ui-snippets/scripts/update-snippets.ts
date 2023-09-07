@@ -500,7 +500,7 @@ function makeValidJSON(input: string): string {
     (_, elements) => {
       const quotedElements = elements
         .split(",")
-        .map((e) => {
+        .map((e: any) => {
           const trimmed = e.trim();
           return trimmed.startsWith('"') && trimmed.endsWith('"')
             ? trimmed
