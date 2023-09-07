@@ -1,9 +1,13 @@
 # Change Log
 
-All notable changes to the "gluestack-vscode" extension will be documented in this file.
+## 0.1.0
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+- Released
 
-## [Unreleased]
+## 0.1.1
 
-- Initial release
+- Improved imports and clubbed them.
+
+## 0.1.2
+
+- Fetched new snippets from the gluestack-ui source.

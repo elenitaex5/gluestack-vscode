@@ -5,10 +5,21 @@
       "id": "ui",
       "gitUrl": "https://github.com/gluestack/gluestack-ui.git",
       "docsPath": "example/storybook/src/components",
-      "branchName": "main",
+      "branchName": "patch",
       "repoName": "gluestack-ui",
       "rootDocs": false,
-      "ignoredPaths": ["hooks/useDarkMode.web.ts"],
+      "ignoredPaths": [
+        "hooks/useDarkMode.web.ts",
+        "Typography/Text/TextSizes.tsx",
+        "MediaAndIcons/Icon/AllIcons.tsx",
+        "Feedback/Alert/Variants.tsx",
+        "Forms/Button/ButtonSizes.tsx",
+        "Forms/Button/ButtonStyles.tsx",
+        "Layout/HStack/HStackReversed.tsx",
+        "Layout/VStack/VStackReversed.tsx",
+        "MediaAndIcons/Avatar/AvatarSizes.tsx",
+        "MediaAndIcons/Image/ImageSizes.tsx"
+      ],
       "destinationPath": "./../COMPONENT_COMPLETIONS.json"
     }
   ]
