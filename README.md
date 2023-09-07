@@ -6,7 +6,7 @@ gluestack VS Code Extensions are specifically designed to quicken your developme
 
 This extension provides working snippets that make it easy to navigate between different breakpoints by using tabs. Here's a quick look at snippets in action:
 
-![gluestackSnippet](./demo.gif)
+![gluestackSnippet](/demo.gif)
 
 ## Snippets
 
@@ -14,7 +14,7 @@ gluestack snippets are shorthand for commonly used gluestack components. All sni
 
 # gluestack-ui Snippets
 
-![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/gluestack/gluestack-vscode)
+![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/gluestack.gluestack-vscode)
 ![Visual Studio Marketplace Installs](https://img.shields.io/visual-studio-marketplace/i/gluestack/gluestack-vscode)
 
 gluestack-ui Snippets Extension is specifically designed to quicken your development process using gluestack-ui components
