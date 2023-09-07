@@ -58,11 +58,11 @@ function createSnippetsFile(destinationPath: string) {
 }
 
 function updateSnippetsFromStorybook() {
-  if (fs.existsSync(reposDirectoryPath)) {
-    cleanUp(reposDirectoryPath);
-  }
-  createFolders(reposDirectoryPath);
-  cloneRepoSrc();
+  // if (fs.existsSync(reposDirectoryPath)) {
+  //   cleanUp(reposDirectoryPath);
+  // }
+  // createFolders(reposDirectoryPath);
+  // cloneRepoSrc();
   findAllStoriesFiles(reposDirectoryPath, docsPath);
 }
 
@@ -192,10 +192,10 @@ function fetchSnippetsFromFiles(foundFiles: string[]) {
     const snippetFileContent = fs.readFileSync(foundFiles[i], "utf8");
     const defaultExportedName: any =
       fetchDefaultExportedName(snippetFileContent);
-
     let defaultExportedComponent: any = "";
     let variableStatements: any = "";
     const importsUsed = importsToArray(snippetFileContent);
+
     if (defaultExportedName) {
       defaultExportedComponent = extractdefaultExportedComponent(
         snippetFileContent,
@@ -213,11 +213,15 @@ function fetchSnippetsFromFiles(foundFiles: string[]) {
         argumentFile[0],
         componentName
       );
+
       const argumentFileValidJson = makeValidJSON(argumentFileContent);
+
       const argumentFileJson = JSON.parse(argumentFileValidJson);
+
       const matchedReturnedSnippet = findMatchedReturnedSnippet(
         defaultExportedComponent
       );
+
       const allCombinationsOfProps = findAllCombinationProps(
         argumentFileJson,
         componentName
@@ -478,28 +482,35 @@ function getArgumentFileContent(argumentFilePath: any, componentName: any) {
 // TODO: NEED TO FIX THIS FUNCTION
 // make a valid json from js object
 function makeValidJSON(input: string): string {
-  const jsonStringWithQuotes = input.replace(
-    /'([^']+)'|"([^"]+)"/g,
-    (_, singleQuotes, doubleQuotes) => {
-      return `"${singleQuotes || doubleQuotes}"`;
-    }
-  );
+  const jsonStringWithQuotes = input.replace(/'([^']+)'/g, '"$1"');
 
-  // Add quotes around component value
-  const fixedComponent = jsonStringWithQuotes.replace(
-    /component:\s*([^,\s]+)/g,
-    'component: "$1"'
-  );
-
-  // Replace unquoted property names with quoted property names
-  const quotedProps = fixedComponent.replace(
-    /([{,]\s*)([a-zA-Z_]\w*)(\s*:)/g,
+  const quotedProps = jsonStringWithQuotes.replace(
+    /([{,]\s*)('?[a-zA-Z_]\w*'?)(\s*:)/g,
     '$1"$2"$3'
   );
 
-  // Remove trailing commas from object's last child or array's last element
   const validJSON = quotedProps.replace(/,(\s*[}\]])/g, "$1");
-  return validJSON;
+
+  // Convert variables to strings
+  const stringWithQuotedVariables = validJSON.replace(/: (\w+)/g, ': "$1"');
+
+  // Wrap array elements in double quotes if not already
+  const finalJSON = stringWithQuotedVariables.replace(
+    /\[([^\]]+)\]/g,
+    (_, elements) => {
+      const quotedElements = elements
+        .split(",")
+        .map((e) => {
+          const trimmed = e.trim();
+          return trimmed.startsWith('"') && trimmed.endsWith('"')
+            ? trimmed
+            : `"${trimmed}"`;
+        })
+        .join(", ");
+      return `[${quotedElements}]`;
+    }
+  );
+  return finalJSON;
 }
 
 function findMatchedReturnedSnippet(fileContent: any) {
@@ -509,7 +520,7 @@ function findMatchedReturnedSnippet(fileContent: any) {
   });
 
   let returnStatementCode: string | null = "";
-
+  let returnStatement: any = null;
   traverse(ast, {
     ArrowFunctionExpression(path) {
       // Find the ArrowFunctionExpression representing the component.
@@ -517,7 +528,7 @@ function findMatchedReturnedSnippet(fileContent: any) {
         const firstParam = path.node.params[0];
         if (firstParam.type === "ObjectPattern") {
           // Check if the first parameter is an ObjectPattern (props).
-          const returnStatement = path
+          returnStatement = path
             .get("body")
             .get("body")
             .find((node) => {
@@ -535,8 +546,31 @@ function findMatchedReturnedSnippet(fileContent: any) {
   });
 
   if (returnStatementCode) {
-    // Print the extracted code.
-    return returnStatementCode.replace(/([$])/g, "\\$1");
+    // remove "dataSet" prop from the code snippet
+    const astReturnedCode = parser.parse(returnStatementCode, {
+      sourceType: "module",
+      plugins: ["jsx", "typescript"],
+    });
+
+    traverse(astReturnedCode, {
+      JSXAttribute(path) {
+        if (path.node.name.name === "dataSet") {
+          path.remove();
+        }
+      },
+    });
+
+    returnStatementCode = generate(astReturnedCode).code;
+
+    // remove all the comments from the code
+    returnStatementCode = returnStatementCode.replace(
+      /\/\*[\s\S]*?\*\/|\/\/.*/g,
+      ""
+    );
+
+    // wherever there is $ in the code, add \ before it to escape it
+    returnStatementCode = returnStatementCode.replace(/([$])/g, "\\$1");
+    return returnStatementCode;
   }
   return "";
 }
@@ -555,28 +589,44 @@ function replaceCombinationsOfProps(
   importsUsed: any,
   variableStatements: any
 ) {
-  for (const data in combinations) {
-    const spreadedPropsString = convertToString(combinations[data]);
-    let replacedPropSnippet = snippet.replace(
-      `{...props}`,
-      spreadedPropsString
-    );
-    // replace props. with proper variable
-    if (replacedPropSnippet.includes("props.")) {
-      // write function to find string after props. in snippet and then replace it with the combination[data]. matching key
-      replacedPropSnippet = replacePropsWithMatchingKey(
+  if (snippet.includes("{...props}") && Object.keys(combinations).length > 0) {
+    for (const data in combinations) {
+      const spreadedPropsString = convertToString(combinations[data]);
+      let replacedPropSnippet = snippet.replace(
+        `{...props}`,
+        spreadedPropsString
+      );
+      // replace props. with proper variable
+      if (replacedPropSnippet.includes("props.")) {
+        // write function to find string after props. in snippet and then replace it with the combination[data]. matching key
+        replacedPropSnippet = replacePropsWithMatchingKey(
+          replacedPropSnippet,
+          combinations[data]
+        );
+      }
+      // if it still has props. somewhere , then add $ there
+      if (replacedPropSnippet.includes("props.")) {
+        // write function to find string after props. in snippet and then replace it with the combination[data]. matching key
+        replacedPropSnippet = addDollarToUnresolvedProps(replacedPropSnippet);
+      }
+      saveDataToSnippets(
+        data,
         replacedPropSnippet,
-        combinations[data]
+        defaultExportedNameInSnippet,
+        filePath,
+        importsUsed,
+        variableStatements
       );
     }
-    // if it still has props. somewhere , then add $ there
-    if (replacedPropSnippet.includes("props.")) {
+  } else {
+    let newSnippet = snippet;
+    if (snippet.includes("props.")) {
       // write function to find string after props. in snippet and then replace it with the combination[data]. matching key
-      replacedPropSnippet = addDollarToUnresolvedProps(replacedPropSnippet);
+      newSnippet = addDollarToUnresolvedProps(snippet);
     }
     saveDataToSnippets(
-      data,
-      replacedPropSnippet,
+      "",
+      newSnippet,
       defaultExportedNameInSnippet,
       filePath,
       importsUsed,
@@ -621,7 +671,6 @@ function addDollarToUnresolvedProps(inputSnippet: string) {
 // pseudo code
 // type of data to be saved in the snippets file
 // { "defaultExportedName + combinationDataKey" :{ completion"defaultExportedName + combinationDataKey",imports:"", template:"snippet" } }
-
 function saveDataToSnippets(
   combinationDataKey: any,
   combinationSnippet: any,
@@ -635,11 +684,11 @@ function saveDataToSnippets(
 
   if (tempCombinationDataKey.length > 1) {
     tempCombinationDataKey.shift(); // Remove the first element
-    newCombinationDataKey = tempCombinationDataKey.join("-");
+    newCombinationDataKey = "-" + tempCombinationDataKey.join("-");
   }
 
   const newComponent = {
-    completion: defaultExportedName + "-" + newCombinationDataKey,
+    completion: defaultExportedName + newCombinationDataKey,
     imports: importsUsed,
     template: combinationSnippet,
     variableStatements: variableStatements,
@@ -647,7 +696,7 @@ function saveDataToSnippets(
 
   let fileContent = fs.readFileSync(destinationPath, "utf8");
   let jsonParsed = json5.parse(fileContent);
-  jsonParsed[defaultExportedName + "-" + newCombinationDataKey] = newComponent;
+  jsonParsed[defaultExportedName + newCombinationDataKey] = newComponent;
   // read the data from the file and then push this new data to it
   fs.writeFileSync(destinationPath, JSON.stringify(jsonParsed, null, 2));
 }

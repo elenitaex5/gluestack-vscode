@@ -2,7 +2,11 @@
 
 gluestack VS Code Extensions are specifically designed to quicken your development process using gluestack-ui components
 
-## Prerequisites
+## How Snippets Work
+
+This extension provides working snippets that make it easy to navigate between different breakpoints by using tabs. Here's a quick look at snippets in action:
+
+![gluestackSnippet](./demo.gif)
 
 ## Snippets
 
@@ -26,6 +30,6 @@ Currently it supports adding any usecase of snippet, its used imports, variables
 
 # Usage
 
-1. Install the extension first, it will need a reload.
+1. Install the extension by searching in the vscode marketplace.
 2. Then, go to your code file and whereever you are writing jsx, type `gs-` and you will get suggestions of the components. Type enter on any of those, and your snippet will get added.
    Collectively, it will also add the imports and the variables and hooks used in the snippet.
